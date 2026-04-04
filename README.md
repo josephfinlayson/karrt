@@ -1,10 +1,26 @@
-# karrt
+<p align="center">
+  <img src="banner.png" alt="karrt — Search, Build, Optimize, Manage: Your Smart Grocery Assistant" width="100%">
+</p>
 
-A CLI tool for REWE grocery pickup ordering — designed for AI agent integration.
+<p align="center">
+  A CLI for REWE grocery pickup ordering — designed for AI agent integration.
+</p>
+
+<p align="center">
+  <a href="#installation">Installation</a> · <a href="#quick-start">Quick Start</a> · <a href="#commands">Commands</a> · <a href="#agent-skill">Agent Skill</a>
+</p>
+
+---
 
 Search products, manage baskets, check timeslots, and place pickup orders from the terminal. All output is JSON, making it ideal for AI agents to parse and act on.
 
 > **Disclaimer:** This is an **unofficial** project and is **not affiliated with, endorsed by, or connected to REWE Group or REWE digital** in any way. It interacts with REWE's public-facing web APIs, which are undocumented and may change at any time. **This tool may break without notice.** Use at your own risk.
+
+## Demo
+
+<p align="center">
+  <img src="demo/demo.gif" alt="karrt demo — AI agent shopping for carbonara ingredients" width="100%">
+</p>
 
 ## Requirements
 
@@ -207,7 +223,17 @@ All commands output JSON. Add `-p` for pretty-printed output:
 node dist/cli.js search "Banane" -p
 ```
 
-Prices are in **cents** (e.g., `currentRetailPrice: 85` = €0.85).
+Prices are in **cents** (e.g., `currentRetailPrice: 85` = 0.85 EUR).
+
+## Agent Skill
+
+Want an AI agent to do your grocery shopping? Install the [karrt agent skill](https://github.com/Tobi4s1337/karrt-skill):
+
+```bash
+npx skills add Tobi4s1337/karrt-skill
+```
+
+The skill works with [Claude Code](https://claude.ai/code), [Cursor](https://cursor.com), [Codex](https://openai.com/codex), and [40+ other agents](https://github.com/vercel-labs/skills#supported-agents) that support the Agent Skills spec.
 
 ## Session Management
 
