@@ -10,7 +10,7 @@ export interface CurrentStore {
 function configDir(): string {
   return join(
     process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
-    "rewe-cli",
+    "karrt",
   );
 }
 

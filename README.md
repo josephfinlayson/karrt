@@ -211,9 +211,9 @@ Prices are in **cents** (e.g., `currentRetailPrice: 85` = €0.85).
 
 ## Session Management
 
-Login creates a browser session stored in `~/.config/rewe-cli/session.json`. The session cookies (especially `rstp`) expire roughly every 10 minutes. When you get a 401/403 error, re-run `karrt login`.
+Login creates a browser session stored in `~/.config/karrt/session.json`. The session cookies (especially `rstp`) expire roughly every 10 minutes. When you get a 401/403 error, re-run `karrt login`.
 
-All config is stored in `~/.config/rewe-cli/`:
+All config is stored in `~/.config/karrt/`:
 - `session.json` — Browser cookies
 - `selected_store` / `selected_zip` — Current store
 - `basket-id` — Active basket ID
