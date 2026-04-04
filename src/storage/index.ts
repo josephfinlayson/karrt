@@ -22,11 +22,17 @@ async function ensureDir(dir: string): Promise<void> {
 
 export async function readSettings(): Promise<CurrentStore> {
   const dir = configDir();
-  const [wwIdent, zipCode] = await Promise.all([
-    readFile(join(dir, "selected_store"), "utf-8"),
-    readFile(join(dir, "selected_zip"), "utf-8"),
-  ]);
-  return { wwIdent: wwIdent.trim(), zipCode: zipCode.trim() };
+  try {
+    const [wwIdent, zipCode] = await Promise.all([
+      readFile(join(dir, "selected_store"), "utf-8"),
+      readFile(join(dir, "selected_zip"), "utf-8"),
+    ]);
+    return { wwIdent: wwIdent.trim(), zipCode: zipCode.trim() };
+  } catch {
+    throw new Error(
+      "No store configured. Run: rewe store search <zip> then rewe store set <wwIdent> <zip>",
+    );
+  }
 }
 
 export async function writeSettings(

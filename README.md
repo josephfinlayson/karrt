@@ -13,6 +13,7 @@ Search products, manage baskets, check timeslots, and place pickup orders from t
 - A **REWE account** with pickup enabled for your store
 - A **2Captcha** account and API key (for solving Turnstile CAPTCHAs during login)
 - **Linux** recommended (tested on Ubuntu). macOS should work but is untested.
+- **X server or xvfb** — login opens a headed browser. On headless servers (VPS), install `xvfb` and prefix the login command with `xvfb-run`.
 
 ## Installation
 
@@ -110,6 +111,12 @@ rewe login-status                        # Check login flow status
 rewe import-cookies <file>               # Import cookies from Netscape file
 rewe totp-setup <secret>                 # Store TOTP secret for auto-2FA
 ```
+
+> **Headless server?** Login opens a real browser. On a VPS without a display, use:
+> ```bash
+> xvfb-run node dist/cli.js login
+> ```
+> Install xvfb first: `apt install xvfb`
 
 ### Product Search
 

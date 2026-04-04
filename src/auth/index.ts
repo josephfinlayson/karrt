@@ -6,6 +6,7 @@ import { clearSession, writeSessionState } from "../storage/index.js";
 import type { ReweHttpClient } from "../http/client.js";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 
 chromium.use(StealthPlugin());
 
@@ -33,6 +34,14 @@ export async function login(
   if (!userEmail || !userPassword) {
     throw new Error(
       "Email and password required. Use --email/--password or REWE_EMAIL/REWE_PASSWORD env vars.",
+    );
+  }
+
+  if (!existsSync(EXTENSION_PATH) || !existsSync(resolve(EXTENSION_PATH, "manifest.json"))) {
+    throw new Error(
+      "2Captcha browser extension not found at 2captcha-solver/. " +
+      "Download it from https://github.com/2captcha/solver_browser_extension/releases " +
+      "and place it in the project root. See README for details.",
     );
   }
 
