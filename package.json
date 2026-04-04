@@ -1,10 +1,10 @@
 {
-  "name": "rewe-cli",
+  "name": "karrt",
   "version": "0.1.0",
   "description": "REWE Pickup CLI for AI agents — grocery ordering from the terminal",
   "type": "module",
   "bin": {
-    "rewe": "./dist/cli.js"
+    "karrt": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",

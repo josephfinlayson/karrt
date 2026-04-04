@@ -49,7 +49,7 @@ async function getApi(): Promise<ReweApi> {
   const valid = await hasValidSession();
   if (!valid) {
     throw new Error(
-      "No valid session. Run `rewe login` or `rewe import-cookies <file>` first.",
+      "No valid session. Run `karrt login` or `karrt import-cookies <file>` first.",
     );
   }
   return new ReweApi(client, store);
@@ -66,8 +66,8 @@ async function run(fn: () => Promise<void>): Promise<void> {
 }
 
 program
-  .name("rewe")
-  .description("REWE Pickup CLI — grocery ordering from the terminal")
+  .name("karrt")
+  .description("karrt — grocery ordering from the terminal")
   .version("0.2.0")
   .option("-p, --pretty", "Pretty-print JSON output");
 

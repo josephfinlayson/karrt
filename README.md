@@ -1,4 +1,4 @@
-# rewe-cli
+# karrt
 
 A CLI tool for REWE grocery pickup ordering — designed for AI agent integration.
 
@@ -18,8 +18,8 @@ Search products, manage baskets, check timeslots, and place pickup orders from t
 ## Installation
 
 ```bash
-git clone https://github.com/Tobi4s1337/rewe-cli.git
-cd rewe-cli
+git clone https://github.com/Tobi4s1337/karrt.git
+cd karrt
 npm install
 npx playwright install chromium
 npm run build
@@ -68,7 +68,7 @@ To get the TOTP secret:
 3. When shown the QR code, look for the "manual entry" option — that gives you the base32 secret
 4. Enter it both in your authenticator app AND via `totp-setup`
 
-With TOTP configured, `rewe login` is fully hands-free: it fills credentials, solves the CAPTCHA, and auto-generates the 2FA code.
+With TOTP configured, `karrt login` is fully hands-free: it fills credentials, solves the CAPTCHA, and auto-generates the 2FA code.
 
 ## Quick Start
 
@@ -97,19 +97,19 @@ node dist/cli.js timeslots
 ### Store Management
 
 ```bash
-rewe store show                    # Show current store
-rewe store search <zip>            # Find pickup stores near ZIP code
-rewe store set <wwIdent> <zip>     # Set active store
+karrt store show                    # Show current store
+karrt store search <zip>            # Find pickup stores near ZIP code
+karrt store set <wwIdent> <zip>     # Set active store
 ```
 
 ### Authentication
 
 ```bash
-rewe login [--email X] [--password Y]   # Browser-based login
-rewe verify <code>                       # Provide 2FA code (if TOTP not configured)
-rewe login-status                        # Check login flow status
-rewe import-cookies <file>               # Import cookies from Netscape file
-rewe totp-setup <secret>                 # Store TOTP secret for auto-2FA
+karrt login [--email X] [--password Y]   # Browser-based login
+karrt verify <code>                       # Provide 2FA code (if TOTP not configured)
+karrt login-status                        # Check login flow status
+karrt import-cookies <file>               # Import cookies from Netscape file
+karrt totp-setup <secret>                 # Store TOTP secret for auto-2FA
 ```
 
 > **Headless server?** Login opens a real browser. On a VPS without a display, use:
@@ -121,7 +121,7 @@ rewe totp-setup <secret>                 # Store TOTP secret for auto-2FA
 ### Product Search
 
 ```bash
-rewe search <query> [options]
+karrt search <query> [options]
 ```
 
 | Option | Description |
@@ -161,19 +161,19 @@ Slugs are kebab-case German category names (ä→ae, ö→oe, ü→ue). If a slu
 ### Basket
 
 ```bash
-rewe basket show                      # Show current basket
-rewe basket add <listingId> [--qty N] # Add item
-rewe basket update <listingId> <qty>  # Update quantity
-rewe basket remove <listingId>        # Remove item
-rewe basket clear                     # Clear all items
-rewe basket bulk-add '<json>'         # Add multiple: '[{"listingId":"x","qty":1}]'
+karrt basket show                      # Show current basket
+karrt basket add <listingId> [--qty N] # Add item
+karrt basket update <listingId> <qty>  # Update quantity
+karrt basket remove <listingId>        # Remove item
+karrt basket clear                     # Clear all items
+karrt basket bulk-add '<json>'         # Add multiple: '[{"listingId":"x","qty":1}]'
 ```
 
 ### Timeslots
 
 ```bash
-rewe timeslots                     # List available pickup timeslots
-rewe timeslot-reserve <slotId>     # Reserve a timeslot
+karrt timeslots                     # List available pickup timeslots
+karrt timeslot-reserve <slotId>     # Reserve a timeslot
 ```
 
 Time-sensitive commands include a `now` field with the current local date/time (Europe/Berlin).
@@ -181,22 +181,22 @@ Time-sensitive commands include a `now` field with the current local date/time (
 ### Orders
 
 ```bash
-rewe orders show                   # List all orders
-rewe orders get <orderId>          # Order details
-rewe orders cancel <orderId>       # Cancel order
+karrt orders show                   # List all orders
+karrt orders get <orderId>          # Order details
+karrt orders cancel <orderId>       # Cancel order
 ```
 
 ### Receipts
 
 ```bash
-rewe receipts show                           # List digital receipts
-rewe receipts download <receiptId> [--output] # Download PDF
+karrt receipts show                           # List digital receipts
+karrt receipts download <receiptId> [--output] # Download PDF
 ```
 
 ### Suggestions
 
 ```bash
-rewe suggestion <N>    # Suggest N items based on order history to reach free pickup
+karrt suggestion <N>    # Suggest N items based on order history to reach free pickup
 ```
 
 ## Output Format
@@ -211,7 +211,7 @@ Prices are in **cents** (e.g., `currentRetailPrice: 85` = €0.85).
 
 ## Session Management
 
-Login creates a browser session stored in `~/.config/rewe-cli/session.json`. The session cookies (especially `rstp`) expire roughly every 10 minutes. When you get a 401/403 error, re-run `rewe login`.
+Login creates a browser session stored in `~/.config/rewe-cli/session.json`. The session cookies (especially `rstp`) expire roughly every 10 minutes. When you get a 401/403 error, re-run `karrt login`.
 
 All config is stored in `~/.config/rewe-cli/`:
 - `session.json` — Browser cookies
