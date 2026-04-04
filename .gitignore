@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.chrome-data/
+tmp/
+*.log
+.env
+2captcha-solver/

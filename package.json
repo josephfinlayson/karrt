@@ -1,0 +1,27 @@
+{
+  "name": "rewe-cli",
+  "version": "0.1.0",
+  "description": "REWE Pickup CLI for AI agents — grocery ordering from the terminal",
+  "type": "module",
+  "bin": {
+    "rewe": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "2captcha-ts": "^2.4.1",
+    "axios": "^1.14.0",
+    "commander": "^13.1.0",
+    "playwright": "^1.52.0",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  }
+}
