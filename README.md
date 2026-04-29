@@ -47,9 +47,13 @@ The login flow uses a Chromium browser extension from [2Captcha](https://2captch
 
 1. **Get a 2Captcha account** at [2captcha.com](https://2captcha.com/) and add funds (a few dollars lasts a long time — each solve costs ~$0.002).
 
-2. **Download the 2Captcha browser extension** from their [GitHub releases](https://github.com/2captcha/solver_browser_extension/releases) or the Chrome Web Store.
+2. **Download the 2Captcha browser extension.** The upstream repo at `2captcha/solver_browser_extension` was archived, so use this mirror instead:
+   ```bash
+   git clone https://github.com/Tobi4s1337/2captcha-solver-mirror.git 2captcha-solver
+   ```
+   Alternatively, install from the [Chrome Web Store](https://chrome.google.com/webstore/detail/2captcha-solver/ifibfemgeogfhoebkmokieepdoobkbpo) and unpack the crx.
 
-3. **Place the extension** in the `2captcha-solver/` directory at the project root. It should contain a `manifest.json` file.
+3. **Verify** that `2captcha-solver/manifest.json` exists at the project root after cloning.
 
 4. **Configure the extension** by editing `2captcha-solver/common/config.js` and setting your API key:
    ```js
