@@ -35,6 +35,10 @@ function browserPaths(): { root: string; executablePath?: string } {
   };
 }
 
+function shouldRunHeadless(): boolean {
+  return !process.env.DISPLAY;
+}
+
 async function clickText(page: Page, text: string): Promise<boolean> {
   const clicked = await page.evaluate((needle: string) => {
     const nodes = Array.from(document.querySelectorAll("button,a,[role=button],span,div"));
@@ -115,7 +119,7 @@ async function driveToCheckoutConfirmation(page: Page): Promise<CheckoutBrowserS
 export async function reachCheckoutConfirmation(): Promise<CheckoutBrowserState> {
   const { root, executablePath } = browserPaths();
   const context = await chromium.launchPersistentContext(resolve(root, ".chrome-data"), {
-    headless: false,
+    headless: shouldRunHeadless(),
     executablePath,
     args: ["--no-sandbox", "--disable-blink-features=AutomationControlled"],
     viewport: { width: 1280, height: 1200 },
@@ -140,7 +144,7 @@ export async function placeOrder(confirm: string): Promise<CheckoutBrowserState>
   const context = await chromium.launchPersistentContext(
     resolve(root, ".chrome-data"),
     {
-      headless: false,
+      headless: shouldRunHeadless(),
       executablePath,
       args: ["--no-sandbox", "--disable-blink-features=AutomationControlled"],
       viewport: { width: 1280, height: 1200 },

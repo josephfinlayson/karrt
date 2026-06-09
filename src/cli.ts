@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { spawnSync } from "node:child_process";
 import { ReweHttpClient } from "./http/client.js";
 import {
   readSettings,
@@ -37,6 +38,25 @@ function withTimestamp(data: unknown): { now: string; data: unknown } {
 
 function getPretty(): boolean {
   return !!program.opts().pretty;
+}
+
+function relaunchWithXvfbIfNeeded(): boolean {
+  if (process.env.DISPLAY || process.env.KARRT_XVFB) return false;
+  const result = spawnSync(
+    "xvfb-run",
+    ["-a", process.execPath, ...process.argv.slice(1)],
+    {
+      stdio: "inherit",
+      env: { ...process.env, KARRT_XVFB: "1" },
+    },
+  );
+  if (result.error) {
+    throw new Error(
+      "Checkout browser automation requires an X server. Install xvfb or run with xvfb-run.",
+    );
+  }
+  process.exitCode = result.status ?? 1;
+  return true;
 }
 
 function getClient(): ReweHttpClient {
@@ -406,6 +426,7 @@ checkoutCmd
   .option("--confirm <phrase>", "Must be exactly: PLACE REWE ORDER")
   .action((opts: { confirm?: string }) =>
     run(async () => {
+      if (relaunchWithXvfbIfNeeded()) return;
       const { placeOrder, reachCheckoutConfirmation } = await import("./checkout/browser.js");
       if (opts.confirm !== "PLACE REWE ORDER") {
         const review = await reachCheckoutConfirmation();
