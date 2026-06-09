@@ -87,7 +87,7 @@ storeCmd
 
 storeCmd
   .command("search <zip>")
-  .description("Find pickup stores near ZIP code")
+  .description("Find delivery service near ZIP code")
   .action((zip: string) =>
     run(async () => {
       const client = getClient();
@@ -356,7 +356,7 @@ basketCmd
 
 program
   .command("timeslots")
-  .description("List available pickup timeslots")
+  .description("List available delivery timeslots")
   .action(() =>
     run(async () => {
       const api = await getApi();
@@ -366,11 +366,59 @@ program
 
 program
   .command("timeslot-reserve <slotId>")
-  .description("Reserve a pickup timeslot")
+  .description("Reserve a delivery timeslot")
   .action((slotId: string) =>
     run(async () => {
       const api = await getApi();
       output(withTimestamp(await api.timeslotReserve(slotId)), getPretty());
+    }),
+  );
+
+// ── checkout ──
+
+const checkoutCmd = program
+  .command("checkout")
+  .description("Inspect delivery checkout readiness without placing an order");
+
+checkoutCmd
+  .command("status", { isDefault: true })
+  .description("Show basket, delivery minimum, and slot readiness")
+  .action(() =>
+    run(async () => {
+      const api = await getApi();
+      output(withTimestamp(await api.checkoutStatus()), getPretty());
+    }),
+  );
+
+checkoutCmd
+  .command("review")
+  .description("Show final pre-order review data without placing an order")
+  .action(() =>
+    run(async () => {
+      const api = await getApi();
+      output(withTimestamp(await api.checkoutStatus()), getPretty());
+    }),
+  );
+
+checkoutCmd
+  .command("place-order")
+  .description("Place the REWE order only with an explicit confirmation phrase")
+  .option("--confirm <phrase>", "Must be exactly: PLACE REWE ORDER")
+  .action((opts: { confirm?: string }) =>
+    run(async () => {
+      const { placeOrder, reachCheckoutConfirmation } = await import("./checkout/browser.js");
+      if (opts.confirm !== "PLACE REWE ORDER") {
+        const review = await reachCheckoutConfirmation();
+        output(
+          {
+            ...withTimestamp(review),
+            message: "Dry run only. Re-run with --confirm \"PLACE REWE ORDER\" to click `Jetzt bestellen`.",
+          },
+          getPretty(),
+        );
+        return;
+      }
+      output(withTimestamp(await placeOrder(opts.confirm)), getPretty());
     }),
   );
 
@@ -444,7 +492,7 @@ receiptsCmd
 
 program
   .command("suggestion <num>")
-  .description("Suggest N items to reach free pickup threshold")
+  .description("Suggest N items to reach free delivery threshold")
   .action((num: string) =>
     run(async () => {
       const api = await getApi();

@@ -108,6 +108,10 @@ export async function writeBasketId(id: string): Promise<void> {
   await writeFile(basketIdPath(), id, { mode: 0o600 });
 }
 
+export async function clearBasketId(): Promise<void> {
+  await unlink(basketIdPath()).catch(() => {});
+}
+
 /** Check if a session file exists with non-expired cookies. */
 export async function hasValidSession(): Promise<boolean> {
   const p = await readSessionPath();

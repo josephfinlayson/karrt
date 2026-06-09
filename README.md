@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  A CLI for REWE grocery pickup ordering — designed for AI agent integration.
+  A CLI for REWE grocery delivery ordering — designed for AI agent integration.
 </p>
 
 <p align="center">
@@ -12,7 +12,7 @@
 
 ---
 
-Search products, manage baskets, check timeslots, and place pickup orders from the terminal. All output is JSON, making it ideal for AI agents to parse and act on.
+Search products, manage baskets, check timeslots, and place delivery orders from the terminal. All output is JSON, making it ideal for AI agents to parse and act on.
 
 > **Disclaimer:** This is an **unofficial** project and is **not affiliated with, endorsed by, or connected to REWE Group or REWE digital** in any way. It interacts with REWE's public-facing web APIs, which are undocumented and may change at any time. **This tool may break without notice.** Use at your own risk.
 
@@ -26,7 +26,7 @@ Search products, manage baskets, check timeslots, and place pickup orders from t
 
 - **Node.js** >= 18
 - **Playwright** browsers (installed automatically)
-- A **REWE account** with pickup enabled for your store
+- A **REWE account** with delivery enabled for your address
 - A **2Captcha** account and API key (for solving Turnstile CAPTCHAs during login)
 - **Linux** recommended (tested on Ubuntu). macOS should work but is untested.
 - **X server or xvfb** — login opens a headed browser. On headless servers (VPS), install `xvfb` and prefix the login command with `xvfb-run`.
@@ -93,7 +93,7 @@ With TOTP configured, `karrt login` is fully hands-free: it fills credentials, s
 ## Quick Start
 
 ```bash
-# 1. Find your local REWE pickup store
+# 1. Find your local REWE delivery service
 node dist/cli.js store search 66113
 
 # 2. Set your store
@@ -110,6 +110,13 @@ node dist/cli.js basket add "8-Y4PWBC9S-d1125764-996e-3535-8619-eff4f86b672f"
 
 # 6. Check timeslots
 node dist/cli.js timeslots
+
+# 7. Review checkout readiness
+node dist/cli.js checkout status
+
+# 8. Dry-run final review, then explicitly place the order
+node dist/cli.js checkout place-order
+node dist/cli.js checkout place-order --confirm "PLACE REWE ORDER"
 ```
 
 ## Commands
@@ -118,7 +125,7 @@ node dist/cli.js timeslots
 
 ```bash
 karrt store show                    # Show current store
-karrt store search <zip>            # Find pickup stores near ZIP code
+karrt store search <zip>            # Find delivery service near ZIP code
 karrt store set <wwIdent> <zip>     # Set active store
 ```
 
@@ -192,11 +199,22 @@ karrt basket bulk-add '<json>'         # Add multiple: '[{"listingId":"x","qty":
 ### Timeslots
 
 ```bash
-karrt timeslots                     # List available pickup timeslots
+karrt timeslots                     # List available delivery timeslots
 karrt timeslot-reserve <slotId>     # Reserve a timeslot
 ```
 
 Time-sensitive commands include a `now` field with the current local date/time (Europe/Berlin).
+
+### Checkout
+
+```bash
+karrt checkout status               # Basket, minimum order, and timeslot readiness
+karrt checkout review               # Final pre-order review data
+karrt checkout place-order          # Dry-run the final review page only
+karrt checkout place-order --confirm "PLACE REWE ORDER"  # Click Jetzt bestellen
+```
+
+`checkout place-order` opens the real REWE checkout in Chromium. Without the exact confirmation phrase it only verifies that the final review page is reachable and reports whether the `Jetzt bestellen` button is available. With `--confirm "PLACE REWE ORDER"`, it clicks the final order button.
 
 ### Orders
 
@@ -216,7 +234,7 @@ karrt receipts download <receiptId> [--output] # Download PDF
 ### Suggestions
 
 ```bash
-karrt suggestion <N>    # Suggest N items based on order history to reach free pickup
+karrt suggestion <N>    # Suggest N items based on order history to reach free delivery
 ```
 
 ## Output Format
@@ -256,6 +274,7 @@ All config is stored in `~/.config/karrt/`:
 - **Search** is public — no authentication needed
 - **Basket commands** use the persistent Chromium profile so the request is sent from the same browser context as rewe.de
 - **Orders, receipts, favorites, and timeslots** use the stored API session
+- **Checkout commands** report readiness, dry-run the final review page, and place orders only with an exact confirmation phrase
 - Login uses **Playwright** with stealth plugins to automate the REWE login page
 - **Turnstile CAPTCHA** is solved by the 2Captcha browser extension running inside Chromium
 - The login page sometimes shows a "continue with remembered account" prompt instead of the login form — both flows are handled automatically
@@ -265,8 +284,8 @@ All config is stored in `~/.config/karrt/`:
 
 - Some API sessions expire frequently (~10 min) — re-run `karrt login` if non-basket commands return 401/403
 - The 2Captcha extension needs a few seconds to solve each CAPTCHA
-- Checkout/payment is not yet implemented — you can build a basket and reserve a timeslot, but need to complete the order on rewe.de
-- Only REWE Pickup is supported (not delivery)
+- Order placement relies on REWE's browser checkout flow and may break if REWE changes the page
+- Only REWE delivery is supported
 - Category slugs may change if REWE reorganizes their product categories
 
 ## License

@@ -95,6 +95,6 @@ echo ""
 pause 0.8
 
 slow_print "${DIM}📱 Reply: Got your carbonara ingredients! 4 items, total 5.66€."
-slow_print "   All budget picks. Ready for pickup — want me to reserve a timeslot?${RESET}"
+slow_print "   All budget picks. Ready for delivery — want me to reserve a timeslot?${RESET}"
 echo ""
 pause 4

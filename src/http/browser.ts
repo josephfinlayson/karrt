@@ -12,6 +12,19 @@ const API_BASE = "https://www.rewe.de/shop/api";
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
+export class BrowserApiError extends Error {
+  constructor(
+    public status: number,
+    public method: string,
+    public url: string,
+    public body: string,
+  ) {
+    super(
+      `Browser API error ${status} ${method} ${url}: ${body.slice(0, 500)}`,
+    );
+  }
+}
+
 function buildUrl(path: string, params?: QueryParams): string {
   const base = path.startsWith("http") ? path : `${API_BASE}${path}`;
   if (!params || Object.keys(params).length === 0) return base;
@@ -81,8 +94,11 @@ export async function browserRequest<T>(
     );
 
     if (result.status >= 400) {
-      throw new Error(
-        `Browser API error ${result.status} ${method} ${buildUrl(path, params)}: ${result.text.slice(0, 500)}`,
+      throw new BrowserApiError(
+        result.status,
+        method,
+        buildUrl(path, params),
+        result.text,
       );
     }
 
