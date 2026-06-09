@@ -1,4 +1,3 @@
-import axios, { type AxiosInstance, type AxiosResponse } from "axios";
 import {
   readSessionState,
   writeSessionState,
@@ -45,24 +44,10 @@ export interface StoredCookie {
  * Updates stored cookies when Set-Cookie headers are received.
  */
 export class ReweHttpClient {
-  private ax: AxiosInstance;
   private cookies: StoredCookie[] = [];
   private loaded = false;
 
-  constructor() {
-    this.ax = axios.create({
-      baseURL: API_BASE,
-      timeout: 30000,
-      headers: {
-        "User-Agent": USER_AGENT,
-        "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
-      },
-      // Don't follow redirects automatically — we need to handle cookies
-      maxRedirects: 5,
-      // Don't throw on non-2xx so we can handle errors ourselves
-      validateStatus: () => true,
-    });
-  }
+  constructor() {}
 
   /** Load cookies from disk on first use. */
   private async ensureCookies(): Promise<void> {
@@ -80,10 +65,15 @@ export class ReweHttpClient {
   }
 
   /** Update cookies from Set-Cookie response headers. */
-  private handleSetCookies(response: AxiosResponse): void {
-    const setCookie = response.headers["set-cookie"];
-    if (!setCookie) return;
-    this.cookies = mergeSetCookies(this.cookies, setCookie);
+  private handleSetCookies(headers: globalThis.Headers): void {
+    const getSetCookie = (headers as unknown as { getSetCookie?: () => string[] }).getSetCookie;
+    const setCookies = typeof getSetCookie === "function"
+      ? getSetCookie.call(headers)
+      : headers.get("set-cookie")
+        ? [headers.get("set-cookie") as string]
+        : [];
+    if (setCookies.length === 0) return;
+    this.cookies = mergeSetCookies(this.cookies, setCookies);
   }
 
   private async request<T>(
@@ -99,6 +89,8 @@ export class ReweHttpClient {
     const cookieHeader = cookiesToHeader(this.cookies, url);
 
     const reqHeaders: Record<string, string> = {
+      "User-Agent": USER_AGENT,
+      "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
       ...headers,
       ...(cookieHeader ? { Cookie: cookieHeader } : {}),
     };
@@ -107,33 +99,37 @@ export class ReweHttpClient {
       reqHeaders["Content-Type"] = "application/json";
     }
 
-    const response = await this.ax.request({
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(url, {
       method,
-      url,
       headers: reqHeaders,
-      data: body,
-    });
+      body: body === undefined
+        ? undefined
+        : typeof body === "string"
+          ? body
+          : JSON.stringify(body),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
 
-    this.handleSetCookies(response);
+    this.handleSetCookies(response.headers);
 
     const status = response.status;
+    const text = await response.text();
     if (status >= 400) {
-      const text =
-        typeof response.data === "string"
-          ? response.data.slice(0, 500)
-          : JSON.stringify(response.data).slice(0, 500);
       if (status === 401 || status === 403) {
         throw new Error(
           `Auth error ${status} ${method} ${url}. Session may be expired — run \`rewe login\` or \`rewe import-cookies\`.`,
         );
       }
-      throw new Error(`API error ${status} ${method} ${url}: ${text}`);
+      throw new Error(`API error ${status} ${method} ${url}: ${text.slice(0, 500)}`);
     }
 
     // Save cookies after successful requests
     await this.saveSession();
 
-    return response.data as T;
+    if (!text) return undefined as T;
+    return JSON.parse(text) as T;
   }
 
   async get<T>(
@@ -179,19 +175,25 @@ export class ReweHttpClient {
     const url = buildUrl(path, params);
     const cookieHeader = cookiesToHeader(this.cookies, url);
 
-    const response = await this.ax.request({
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(url, {
       method: "GET",
-      url,
-      headers: { ...headers, ...(cookieHeader ? { Cookie: cookieHeader } : {}) },
-      responseType: "arraybuffer",
-    });
+      headers: {
+        "User-Agent": USER_AGENT,
+        "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
+        ...headers,
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+      },
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
 
-    this.handleSetCookies(response);
+    this.handleSetCookies(response.headers);
 
     if (response.status >= 400) {
       throw new Error(`API error ${response.status} GET ${url}`);
     }
-    return Buffer.from(response.data);
+    return Buffer.from(await response.arrayBuffer());
   }
 
   /** No-op close for API compatibility. */

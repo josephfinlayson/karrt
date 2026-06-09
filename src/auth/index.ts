@@ -51,9 +51,20 @@ export async function login(
   const totpSecret = await readTotpSecret();
 
   const userDataDir = resolve(__dirname, "../../.chrome-data");
+  const persistentBrowserPath = resolve(__dirname, "../../../ms-playwright");
+  const persistentChromiumPath = resolve(
+    persistentBrowserPath,
+    "chromium-1217/chrome-linux64/chrome",
+  );
+  if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync(persistentBrowserPath)) {
+    process.env.PLAYWRIGHT_BROWSERS_PATH = persistentBrowserPath;
+  }
 
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless: false as const,
+    executablePath: existsSync(persistentChromiumPath)
+      ? persistentChromiumPath
+      : undefined,
     args: [
       `--disable-extensions-except=${EXTENSION_PATH}`,
       `--load-extension=${EXTENSION_PATH}`,

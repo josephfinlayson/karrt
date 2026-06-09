@@ -5,3 +5,6 @@ tmp/
 *.log
 .env
 2captcha-solver/
+certs/
+*.pem
+*.key

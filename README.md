@@ -241,7 +241,7 @@ The skill works with [Claude Code](https://claude.ai/code), [Cursor](https://cur
 
 ## Session Management
 
-Login creates a browser session stored in `~/.config/karrt/session.json`. The session cookies (especially `rstp`) expire roughly every 10 minutes. When you get a 401/403 error, re-run `karrt login`.
+Login creates a browser session stored in both `~/.config/karrt/session.json` and the persistent Playwright profile at `.chrome-data/`. Some basket requests are executed inside Chromium because REWE returns `400 Bad Request` for the same basket request when replayed from plain Node/curl.
 
 All config is stored in `~/.config/karrt/`:
 - `session.json` — Browser cookies
@@ -249,19 +249,21 @@ All config is stored in `~/.config/karrt/`:
 - `basket-id` — Active basket ID
 - `totp-secret` — TOTP secret for 2FA
 - `login-state.json` — Login flow IPC
+- `.chrome-data/` — Persistent browser profile used by login and basket commands
 
 ## How It Works
 
 - **Search** is public — no authentication needed
-- **Everything else** (basket, orders, timeslots) requires a valid session
+- **Basket commands** use the persistent Chromium profile so the request is sent from the same browser context as rewe.de
+- **Orders, receipts, favorites, and timeslots** use the stored API session
 - Login uses **Playwright** with stealth plugins to automate the REWE login page
 - **Turnstile CAPTCHA** is solved by the 2Captcha browser extension running inside Chromium
 - The login page sometimes shows a "continue with remembered account" prompt instead of the login form — both flows are handled automatically
-- Cookies are extracted from the browser and reused for API calls via **axios**
+- Cookies are extracted from the browser and reused for normal API calls
 
 ## Known Limitations
 
-- Session expires frequently (~10 min) — no automatic refresh yet
+- Some API sessions expire frequently (~10 min) — re-run `karrt login` if non-basket commands return 401/403
 - The 2Captcha extension needs a few seconds to solve each CAPTCHA
 - Checkout/payment is not yet implemented — you can build a basket and reserve a timeslot, but need to complete the order on rewe.de
 - Only REWE Pickup is supported (not delivery)

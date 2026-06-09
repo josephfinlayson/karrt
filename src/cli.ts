@@ -43,11 +43,10 @@ function getClient(): ReweHttpClient {
   return new ReweHttpClient();
 }
 
-async function getApi(): Promise<ReweApi> {
+async function getApi(requireSession: boolean = true): Promise<ReweApi> {
   const client = getClient();
   const store = await readSettings();
-  const valid = await hasValidSession();
-  if (!valid) {
+  if (requireSession && !(await hasValidSession())) {
     throw new Error(
       "No valid session. Run `karrt login` or `karrt import-cookies <file>` first.",
     );
@@ -287,7 +286,7 @@ basketCmd
   .description("Show current basket")
   .action(() =>
     run(async () => {
-      const api = await getApi();
+      const api = await getApi(false);
       output(await api.basket(), getPretty());
     }),
   );
@@ -298,7 +297,7 @@ basketCmd
   .option("--qty <n>", "Quantity (default 1)", "1")
   .action((listingId: string, opts: { qty: string }) =>
     run(async () => {
-      const api = await getApi();
+      const api = await getApi(false);
       output(
         await api.basketAdd(listingId, parseInt(opts.qty, 10)),
         getPretty(),
@@ -311,7 +310,7 @@ basketCmd
   .description("Update item quantity in basket")
   .action((listingId: string, qty: string) =>
     run(async () => {
-      const api = await getApi();
+      const api = await getApi(false);
       output(await api.basketUpdate(listingId, parseInt(qty, 10)), getPretty());
     }),
   );
@@ -322,7 +321,7 @@ basketCmd
   .option("--basket-id <id>", "Basket ID (auto-detected if not provided)")
   .action((listingId: string, opts: { basketId?: string }) =>
     run(async () => {
-      const api = await getApi();
+      const api = await getApi(false);
       const { readBasketId } = await import("./storage/index.js");
       const basketId = opts.basketId ?? await readBasketId();
       if (!basketId) throw new Error("No basket ID. Add an item first.");
@@ -336,7 +335,7 @@ basketCmd
   .description("Remove all items from basket")
   .action(() =>
     run(async () => {
-      const api = await getApi();
+      const api = await getApi(false);
       await api.basketClear();
       output({ message: "Basket cleared" }, getPretty());
     }),
@@ -348,7 +347,7 @@ basketCmd
   .action((json: string) =>
     run(async () => {
       const items = JSON.parse(json) as { listingId: string; qty?: number }[];
-      const api = await getApi();
+      const api = await getApi(false);
       output(await api.basketBulkAdd(items), getPretty());
     }),
   );

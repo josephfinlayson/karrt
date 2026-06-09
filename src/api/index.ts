@@ -1,4 +1,5 @@
 import type { ReweHttpClient, Headers } from "../http/client.js";
+import { browserRequest } from "../http/browser.js";
 import type { CurrentStore } from "../storage/index.js";
 import { readBasketId, writeBasketId } from "../storage/index.js";
 import type {
@@ -52,6 +53,7 @@ export interface SearchOptions {
 function storeHeaders(store: CurrentStore): Headers {
   return {
     "rd-market-id": store.wwIdent,
+    "rd-customer-zip": store.zipCode,
     "rd-postcode": store.zipCode,
     "rd-service-types": "PICKUP",
   };
@@ -177,13 +179,17 @@ export class ReweApi {
   async basket(): Promise<unknown> {
     const basketId = await readBasketId();
     if (!basketId) {
-      return { message: "No basket yet. Add an item first with `rewe basket add`." };
+      return { message: "No basket yet. Add an item first with `karrt basket add`." };
     }
-    const res = await this.client.get<unknown>(
+    const basket = await browserRequest<Record<string, unknown>>(
+      "GET",
       `/baskets/${basketId}`,
-      { ...this.headers, ...BASKET_HEADERS },
+      BASKET_HEADERS,
     );
-    return res;
+    if (typeof basket.id === "string") {
+      await writeBasketId(basket.id);
+    }
+    return basket;
   }
 
   async basketAdd(
@@ -191,41 +197,43 @@ export class ReweApi {
     qty: number = 1,
     context: string = "product-list-category",
   ): Promise<unknown> {
-    const res = await this.client.post<Record<string, unknown>>(
+    const basket = await browserRequest<Record<string, unknown>>(
+      "POST",
       `/baskets/listings/${listingId}`,
-      { ...this.headers, ...BASKET_HEADERS },
+      BASKET_HEADERS,
       { quantity: qty, includeTimeslot: false, context },
     );
-    // Store basket ID for future operations
-    if (res.id) {
-      await writeBasketId(res.id as string);
+    if (typeof basket.id === "string") {
+      await writeBasketId(basket.id);
     }
-    return res;
+    return basket;
   }
 
   async basketUpdate(
     listingId: ListingId,
     qty: number,
   ): Promise<unknown> {
-    const res = await this.client.post<Record<string, unknown>>(
+    const basket = await browserRequest<Record<string, unknown>>(
+      "POST",
       `/baskets/listings/${listingId}`,
-      { ...this.headers, ...BASKET_OVERVIEW_HEADERS },
+      BASKET_OVERVIEW_HEADERS,
       { quantity: qty, includeTimeslot: true, context: "OVERVIEW" },
-      { includeTimeslot: "true" },
     );
-    if (res.id) {
-      await writeBasketId(res.id as string);
+    if (typeof basket.id === "string") {
+      await writeBasketId(basket.id);
     }
-    return res;
+    return basket;
   }
 
   async basketRemove(
     basketId: string,
     listingId: ListingId,
   ): Promise<void> {
-    await this.client.delete(
+    await browserRequest(
+      "DELETE",
       `/baskets/${basketId}/listings/${listingId}`,
-      { ...this.headers, ...BASKET_OVERVIEW_HEADERS },
+      BASKET_OVERVIEW_HEADERS,
+      undefined,
       { includeTimeslot: "true" },
     );
   }
@@ -233,9 +241,10 @@ export class ReweApi {
   async basketClear(): Promise<void> {
     const basketId = await readBasketId();
     if (!basketId) return;
-    const b = await this.client.get<Record<string, unknown>>(
+    const b = await browserRequest<Record<string, unknown>>(
+      "GET",
       `/baskets/${basketId}`,
-      { ...this.headers, ...BASKET_HEADERS },
+      BASKET_HEADERS,
     );
     const lineItems = (b.lineItems ?? []) as Array<{ product: { listing: { listingId: string } } }>;
     for (const item of lineItems) {
