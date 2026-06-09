@@ -178,32 +178,46 @@ export async function login(
         console.log("[4/5] 2FA required...");
 
         // ── Step 4a: Select authenticator app method if method selection is shown ──
-        if (pageText.includes("Sicherheitsmethoden") || pageText.includes("Authentifizierungs-App")) {
+        const hasMethodChoice = await page
+          .locator('text="Code mit Authentifizierungs-App erstellen"')
+          .isVisible({ timeout: 1000 })
+          .catch(() => false);
+
+        if (
+          hasMethodChoice ||
+          pageText.includes("Sicherheitsmethoden") ||
+          pageText.includes("Authentifizierungs-App")
+        ) {
           console.log("      Selecting authenticator app method...");
 
-          // Click the second radio button (Authentifizierungs-App)
-          // The page has radio buttons: 1st = Email, 2nd = Authenticator App
-          const selected = await page.evaluate(() => {
-            const radios = document.querySelectorAll('input[type="radio"]');
-            // Click the second radio (index 1) = Authenticator App
-            if (radios.length >= 2) {
-              const radio = radios[1] as HTMLInputElement;
-              radio.checked = true;
-              radio.click();
-              radio.dispatchEvent(new Event("change", { bubbles: true }));
-              radio.dispatchEvent(new Event("input", { bubbles: true }));
-              return "selected radio index 1, value: " + radio.value;
-            }
-            // Fallback: try label text
-            const labels = Array.from(document.querySelectorAll("label"));
-            for (const label of labels) {
-              if (label.textContent?.includes("Authentifizierungs-App")) {
-                label.click();
-                return "clicked label: " + label.textContent.substring(0, 50);
-              }
-            }
-            return "no radio found, count: " + radios.length;
-          });
+          const authenticatorOption = page
+            .locator(
+              'label:has-text("Authentifizierungs-App"), button:has-text("Authentifizierungs-App"), div:has-text("Authentifizierungs-App")',
+            )
+            .last();
+
+          const selected = await authenticatorOption
+            .click({ timeout: 5000, force: true })
+            .then(() => "clicked authenticator option")
+            .catch(async () => {
+              return page.evaluate(() => {
+                const controls = Array.from(
+                  document.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"]'),
+                );
+                const option = controls.find((control) => {
+                  const text =
+                    control.closest("label")?.textContent ||
+                    control.parentElement?.textContent ||
+                    "";
+                  return text.includes("Authentifizierungs-App");
+                }) as HTMLElement | undefined;
+                if (!option) return "authenticator option not found";
+                option.click();
+                option.dispatchEvent(new Event("input", { bubbles: true }));
+                option.dispatchEvent(new Event("change", { bubbles: true }));
+                return "clicked authenticator input fallback";
+              });
+            });
           console.log("      Selection result:", selected);
 
           await page.waitForTimeout(500);
@@ -218,16 +232,84 @@ export async function login(
                 if (form) form.submit();
               });
             });
-          await page.waitForTimeout(5000);
+          await page.waitForTimeout(2000);
 
           console.log("      After selection URL:", page.url());
           const newText = await page.evaluate(() => document.body?.innerText?.substring(0, 200) || "").catch(() => "");
           console.log("      Page text:", newText.substring(0, 150));
+
+          const otpInput = page.locator(
+            'input[name="otp"], input[autocomplete="one-time-code"], input[inputmode="numeric"]',
+          );
+          if (!(await otpInput.first().isVisible({ timeout: 10000 }).catch(() => false))) {
+            const methodText = await page
+              .evaluate(() => document.body?.innerText?.substring(0, 300) || "")
+              .catch(() => "");
+            throw new Error(
+              "Authenticator app method was selected, but the OTP form did not appear. Page: " +
+                methodText,
+            );
+          }
         }
 
         // ── Step 4b: Generate or get OTP code ──
+        const otpInput = page.locator(
+          'input[name="otp"], input[autocomplete="one-time-code"], input[inputmode="numeric"]',
+        );
+        if (!(await otpInput.first().isVisible({ timeout: 5000 }).catch(() => false))) {
+          const currentText = await page
+            .evaluate(() => document.body?.innerText?.substring(0, 300) || "")
+            .catch(() => "");
+          if (currentText.includes("Bestätigungscode per E-Mail")) {
+            console.log("      Email-code verification page shown — continuing...");
+            await page
+              .click('button:has-text("Weiter"), input[type="submit"]', { timeout: 5000 })
+              .catch(async () => {
+                await page.evaluate(() => {
+                  const form = document.querySelector("form") as HTMLFormElement | null;
+                  if (form) form.submit();
+                });
+              });
+            await page.waitForTimeout(5000);
+          }
+        }
+
+        if (!(await otpInput.first().isVisible({ timeout: 1000 }).catch(() => false))) {
+          const methodText = await page
+            .evaluate(() => document.body?.innerText?.substring(0, 500) || "")
+            .catch(() => "");
+          if (methodText.includes("Code per E-Mail") && methodText.includes("Authentifizierungs-App")) {
+            const methodLabel = totpSecret
+              ? "Code mit Authentifizierungs-App erstellen"
+              : "Code per E-Mail bekommen";
+            console.log(`      Selecting 2FA method: ${methodLabel}`);
+            await page.locator(`text="${methodLabel}"`).click({ timeout: 5000, force: true });
+            await page
+              .click('button:has-text("Weiter"), input[type="submit"]', { timeout: 5000 })
+              .catch(async () => {
+                await page.evaluate(() => {
+                  const form = document.querySelector("form") as HTMLFormElement | null;
+                  if (form) form.submit();
+                });
+              });
+            await page.waitForTimeout(5000);
+          }
+        }
+
+        if (!(await otpInput.first().isVisible({ timeout: 5000 }).catch(() => false))) {
+          const currentText = await page
+            .evaluate(() => document.body?.innerText?.substring(0, 300) || "")
+            .catch(() => "");
+          throw new Error("2FA was required, but no OTP input was visible. Page: " + currentText);
+        }
+
         let otp: string;
-        if (totpSecret) {
+        const otpPageText = await page
+          .evaluate(() => document.body?.innerText?.substring(0, 500) || "")
+          .catch(() => "");
+        const isEmailCode = otpPageText.includes("E-Mail");
+
+        if (totpSecret && !isEmailCode) {
           otp = generateTOTP(totpSecret);
           console.log("      Generated TOTP code.");
         } else {
