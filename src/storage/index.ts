@@ -64,11 +64,21 @@ export async function readSessionPath(): Promise<string | null> {
   return null;
 }
 
-/** Save session state (cookies) to disk. */
+/** Save session state (cookies + optional userId) to disk. */
 export async function writeSessionState(state: object): Promise<void> {
   const dir = configDir();
   await ensureDir(dir);
   await writeFile(sessionPath(), JSON.stringify(state), { mode: 0o600 });
+}
+
+/** Read user ID saved from login JWT. */
+export async function readUserId(): Promise<string | null> {
+  try {
+    const data = JSON.parse(await readFile(sessionPath(), "utf-8"));
+    return (data as Record<string, unknown>).userId as string ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Read session state from disk. */
@@ -106,6 +116,10 @@ export async function writeBasketId(id: string): Promise<void> {
   const dir = configDir();
   await ensureDir(dir);
   await writeFile(basketIdPath(), id, { mode: 0o600 });
+}
+
+export async function clearBasketId(): Promise<void> {
+  await unlink(basketIdPath()).catch(() => {});
 }
 
 /** Check if a session file exists with non-expired cookies. */

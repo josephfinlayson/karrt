@@ -1,7 +1,7 @@
 import type { ReweHttpClient, Headers } from "../http/client.js";
-import { browserRequest } from "../http/browser.js";
+import { BrowserApiError, browserRequest } from "../http/browser.js";
 import type { CurrentStore } from "../storage/index.js";
-import { readBasketId, writeBasketId } from "../storage/index.js";
+import { clearBasketId, readBasketId, writeBasketId } from "../storage/index.js";
 import type {
   Product,
   Basket,
@@ -11,7 +11,7 @@ import type {
   EbonEntry,
   Suggestion,
   SuggestionResponse,
-  PickupMarket,
+  DeliveryMarket,
   ListingId,
   ProductId,
   ItemId,
@@ -23,6 +23,8 @@ import type {
 } from "../types/rewe.js";
 import { getListingId } from "../types/rewe.js";
 import { writeFile } from "node:fs/promises";
+
+const SERVICE_TYPE = "DELIVERY";
 
 // ── Search attributes ──
 
@@ -48,6 +50,25 @@ export interface SearchOptions {
   categorySlug?: string;
 }
 
+export interface CheckoutStatus {
+  ready: boolean;
+  basketId?: string;
+  serviceSelection?: unknown;
+  summary?: unknown;
+  lineItems: Array<{
+    title?: string;
+    quantity?: number;
+    totalPrice?: number;
+    listingId?: string;
+  }>;
+  violations: unknown[];
+  minimumOrderReached: boolean;
+  selectedTimeslot?: unknown;
+  availableTimeslots: number;
+  firstAvailableTimeslot?: unknown;
+  nextActions: string[];
+}
+
 // ── Headers ──
 
 function storeHeaders(store: CurrentStore): Headers {
@@ -55,7 +76,7 @@ function storeHeaders(store: CurrentStore): Headers {
     "rd-market-id": store.wwIdent,
     "rd-customer-zip": store.zipCode,
     "rd-postcode": store.zipCode,
-    "rd-service-types": "PICKUP",
+    "rd-service-types": SERVICE_TYPE,
   };
 }
 
@@ -97,8 +118,7 @@ export class ReweApi {
   ): Promise<Product[]> {
     const params: Record<string, string | string[]> = {
       search: query,
-      market: this.store.wwIdent,
-      serviceTypes: "PICKUP",
+      serviceTypes: SERVICE_TYPE,
       objectsPerPage: String(opts.perPage ?? 40),
       page: String(opts.page ?? 1),
       debug: "false",
@@ -181,15 +201,30 @@ export class ReweApi {
     if (!basketId) {
       return { message: "No basket yet. Add an item first with `karrt basket add`." };
     }
-    const basket = await browserRequest<Record<string, unknown>>(
-      "GET",
-      `/baskets/${basketId}`,
-      BASKET_HEADERS,
-    );
+    const basket = await this.basketById(basketId);
     if (typeof basket.id === "string") {
       await writeBasketId(basket.id);
     }
     return basket;
+  }
+
+  private async basketById(basketId: string): Promise<Record<string, unknown>> {
+    try {
+      return await browserRequest<Record<string, unknown>>(
+        "GET",
+        `/baskets/${basketId}`,
+        BASKET_HEADERS,
+      );
+    } catch (err) {
+      if (err instanceof BrowserApiError && err.status === 404) {
+        await clearBasketId();
+        return {
+          message: "Saved basket expired. Add an item to create a fresh delivery basket.",
+          staleBasketId: basketId,
+        };
+      }
+      throw err;
+    }
   }
 
   async basketAdd(
@@ -241,11 +276,8 @@ export class ReweApi {
   async basketClear(): Promise<void> {
     const basketId = await readBasketId();
     if (!basketId) return;
-    const b = await browserRequest<Record<string, unknown>>(
-      "GET",
-      `/baskets/${basketId}`,
-      BASKET_HEADERS,
-    );
+    const b = await this.basketById(basketId);
+    if (typeof b.staleBasketId === "string") return;
     const lineItems = (b.lineItems ?? []) as Array<{ product: { listing: { listingId: string } } }>;
     for (const item of lineItems) {
       await this.basketRemove(basketId, item.product.listing.listingId);
@@ -273,9 +305,14 @@ export class ReweApi {
   // ── Timeslots ──
 
   async timeslots(): Promise<unknown> {
+    const { readUserId } = await import("../storage/index.js");
+    const userId = await readUserId();
+    const headers = userId
+      ? { ...this.headers, "auth-info-user-id": userId }
+      : this.headers;
     const res = await this.client.get<unknown>(
-      "/timeslots/pickup/overview",
-      this.headers,
+      "/timeslots/delivery/overview",
+      headers,
     );
     return res;
   }
@@ -289,9 +326,77 @@ export class ReweApi {
         customerId: "", // Will be populated from session
         wwIdent: this.store.wwIdent,
         zipCode: this.store.zipCode,
+        serviceType: SERVICE_TYPE,
       },
     );
     return res;
+  }
+
+  // ── Checkout ──
+
+  async checkoutStatus(): Promise<CheckoutStatus> {
+    const basket = await this.basket() as Record<string, unknown>;
+    if (typeof basket.staleBasketId === "string" || !basket.id) {
+      return {
+        ready: false,
+        lineItems: [],
+        violations: [],
+        minimumOrderReached: false,
+        availableTimeslots: 0,
+        nextActions: [
+          "Add an item to create a fresh authenticated delivery basket.",
+        ],
+      };
+    }
+
+    const lineItems = ((basket.lineItems ?? []) as Array<Record<string, unknown>>)
+      .map((item) => {
+        const product = item.product as Record<string, unknown> | undefined;
+        const listing = product?.listing as Record<string, unknown> | undefined;
+        return {
+          title: product?.title as string | undefined,
+          quantity: item.quantity as number | undefined,
+          totalPrice: item.totalPrice as number | undefined,
+          listingId: listing?.listingId as string | undefined,
+        };
+      });
+    const violations = (basket.violations ?? []) as unknown[];
+    const minimumOrderReached = !violations.some((violation) => {
+      const v = violation as Record<string, unknown>;
+      return typeof v.id === "string" && v.id.includes("minimum.delivery");
+    });
+    const timeslots = await this.timeslots() as unknown[];
+    const selectedTimeslot = Array.isArray(timeslots)
+      ? timeslots.find((slot) => (slot as Record<string, unknown>).selected === true)
+      : undefined;
+
+    const nextActions: string[] = [];
+    if (lineItems.length === 0) {
+      nextActions.push("Add delivery items to the basket.");
+    }
+    if (!minimumOrderReached) {
+      nextActions.push("Add more items to reach the REWE delivery minimum.");
+    }
+    if (minimumOrderReached && Array.isArray(timeslots) && timeslots.length > 0 && !selectedTimeslot) {
+      nextActions.push("Choose a delivery slot, then reserve it with `karrt timeslot-reserve <slotId>`.");
+    }
+    if (selectedTimeslot) {
+      nextActions.push("Review the basket and payment state on rewe.de before placing the order.");
+    }
+
+    return {
+      ready: lineItems.length > 0 && minimumOrderReached && Boolean(selectedTimeslot),
+      basketId: basket.id as string,
+      serviceSelection: basket.serviceSelection,
+      summary: basket.summary,
+      lineItems,
+      violations,
+      minimumOrderReached,
+      selectedTimeslot,
+      availableTimeslots: Array.isArray(timeslots) ? timeslots.length : 0,
+      firstAvailableTimeslot: Array.isArray(timeslots) ? timeslots[0] : undefined,
+      nextActions,
+    };
   }
 
   // ── Orders ──
@@ -418,13 +523,13 @@ export async function searchProducts(
 export async function searchStores(
   client: ReweHttpClient,
   zipCode: string,
-): Promise<PickupMarket[]> {
+): Promise<DeliveryMarket[]> {
   const res = await client.get<Record<string, unknown>>(
     "/products",
     PRODUCT_ACCEPT,
     {
       search: "wasser",
-      serviceTypes: "PICKUP",
+      serviceTypes: SERVICE_TYPE,
       market: zipCode,
       objectsPerPage: "5",
     },
@@ -447,7 +552,7 @@ export async function searchStores(
         displayName: `REWE area ${zipCode} — use ZIP as market ID or find your market on rewe.de/marktsuche`,
         city: "",
         zipCode,
-        pickupType: "PICKUP",
+        serviceType: SERVICE_TYPE,
       },
     ];
   }
@@ -457,7 +562,7 @@ export async function searchStores(
     displayName: `REWE Market ${wwIdent}`,
     city: "",
     zipCode,
-    pickupType: "PICKUP",
+    serviceType: SERVICE_TYPE,
   }));
 }
 

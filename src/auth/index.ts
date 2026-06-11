@@ -425,8 +425,23 @@ export async function login(
       const cookies = await context.cookies();
       const reweCookies = cookies.filter((c) => c.domain.includes("rewe"));
 
+      // Extract user ID from KEYCLOAK_IDENTITY JWT (stored in account.rewe.de cookies)
+      let userId: string | undefined;
+      for (const c of reweCookies) {
+        if (c.name === "KEYCLOAK_IDENTITY" && c.value) {
+          try {
+            const parts = c.value.split(".");
+            if (parts.length >= 2) {
+              const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+              userId = payload.sub as string | undefined;
+            }
+          } catch {}
+        }
+      }
+
       // Save cookies in our session format
       await writeSessionState({
+        userId,
         cookies: reweCookies.map((c) => ({
           name: c.name,
           value: c.value,
