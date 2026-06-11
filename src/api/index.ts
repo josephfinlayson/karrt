@@ -136,7 +136,7 @@ export class ReweApi {
 
     const res = await this.client.get<Record<string, unknown>>(
       "/products",
-      PRODUCT_ACCEPT,
+      { ...PRODUCT_ACCEPT, ...this.headers },
       params,
     );
     return extractProducts(res);
@@ -278,9 +278,14 @@ export class ReweApi {
     if (!basketId) return;
     const b = await this.basketById(basketId);
     if (typeof b.staleBasketId === "string") return;
-    const lineItems = (b.lineItems ?? []) as Array<{ product: { listing: { listingId: string } } }>;
+    const lineItems = (b.lineItems ?? []) as Array<Record<string, unknown>>;
     for (const item of lineItems) {
-      await this.basketRemove(basketId, item.product.listing.listingId);
+      const product = item.product as Record<string, unknown> | undefined;
+      const listing = product?.listing as Record<string, unknown> | undefined;
+      const listingId = listing?.listingId;
+      if (typeof listingId === "string" && listingId.length > 0) {
+        await this.basketRemove(basketId, listingId);
+      }
     }
   }
 
@@ -318,12 +323,20 @@ export class ReweApi {
   }
 
   async timeslotReserve(slotId: TimeslotId): Promise<TimeslotReservation> {
+    const { readUserId } = await import("../storage/index.js");
+    const userId = await readUserId();
+    const basket = await this.basket() as Record<string, unknown>;
+    const customerId = typeof basket.customerUuid === "string" ? basket.customerUuid : userId;
+    if (!customerId) {
+      throw new Error("No customer id available. Run `karrt login`, then retry.");
+    }
+    const authHeaders: Record<string, string> = { "auth-info-user-id": customerId };
     const res = await this.client.post<TimeslotReservation>(
       "/timeslot-reservations",
-      { ...this.headers, "Content-Type": "application/json" },
+      { ...this.headers, ...authHeaders, "Content-Type": "application/json" },
       {
         slotId,
-        customerId: "", // Will be populated from session
+        customerId,
         wwIdent: this.store.wwIdent,
         zipCode: this.store.zipCode,
         serviceType: SERVICE_TYPE,
@@ -546,15 +559,10 @@ export async function searchStores(
   }
 
   if (markets.size === 0) {
-    return [
-      {
-        wwIdent: zipCode,
-        displayName: `REWE area ${zipCode} — use ZIP as market ID or find your market on rewe.de/marktsuche`,
-        city: "",
-        zipCode,
-        serviceType: SERVICE_TYPE,
-      },
-    ];
+    throw new Error(
+      "Automatic REWE delivery market discovery is unavailable for this API response. "
+      + "Log in on rewe.de, select Lieferservice for the address, then run `karrt store set <wwIdent> <zip>` with the basket serviceSelection.wwIdent.",
+    );
   }
 
   return Array.from(markets).map((wwIdent) => ({

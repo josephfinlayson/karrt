@@ -11,7 +11,7 @@ const stealth = require('./node_modules/puppeteer-extra-plugin-stealth');
 const { readTotpSecret, generateTOTP } = await import('./dist/auth/totp.js');
 
 chromium.use(stealth());
-const EXEC = '/home/node/.openclaw/ms-playwright/chromium-1217/chrome-linux64/chrome';
+const EXEC = '/home/jfinlays/.openclaw/bin/chromium';
 const EXT  = resolve(__dirname, '2captcha-solver');
 const EMAIL = process.env.REWE_EMAIL;
 const PASS  = process.env.REWE_PASSWORD;

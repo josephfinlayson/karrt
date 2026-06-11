@@ -294,12 +294,12 @@ export interface EbonEntry {
 
 // ── Store search ──
 
-export interface PickupMarket {
+export interface DeliveryMarket {
   wwIdent: string;
   displayName: string;
   city: string;
   zipCode: string;
-  pickupType: string;
+  serviceType: string;
 }
 
 // ── Suggestion ──

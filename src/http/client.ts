@@ -61,7 +61,8 @@ export class ReweHttpClient {
 
   /** Persist current cookies to disk. */
   async saveSession(): Promise<void> {
-    await writeSessionState({ cookies: this.cookies, origins: [] });
+    const current = await readSessionState() as { userId?: string } | null;
+    await writeSessionState({ userId: current?.userId, cookies: this.cookies, origins: [] });
   }
 
   /** Update cookies from Set-Cookie response headers. */

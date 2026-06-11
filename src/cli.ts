@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { spawnSync } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
 import { ReweHttpClient } from "./http/client.js";
 import {
   readSettings,
@@ -37,6 +39,46 @@ function withTimestamp(data: unknown): { now: string; data: unknown } {
 
 function getPretty(): boolean {
   return !!program.opts().pretty;
+}
+
+function findXvfbRun(): string {
+  const candidates = [
+    process.env.XVFB_RUN_PATH,
+    "/run/current-system/sw/bin/xvfb-run",
+    "/usr/bin/xvfb-run",
+  ];
+  for (const path of candidates) {
+    if (typeof path === "string" && existsSync(path)) return path;
+  }
+  try {
+    for (const entry of readdirSync("/nix/store").sort()) {
+      const path = `/nix/store/${entry}/bin/xvfb-run`;
+      if (entry.includes("xvfb-run") && existsSync(path)) return path;
+    }
+  } catch {
+    // Fall through to PATH lookup for non-Nix systems.
+  }
+  return "xvfb-run";
+}
+
+function relaunchWithXvfbIfNeeded(): boolean {
+  if (process.env.DISPLAY || process.env.KARRT_XVFB) return false;
+  const xvfbRun = findXvfbRun();
+  const result = spawnSync(
+    xvfbRun,
+    ["-a", process.execPath, ...process.argv.slice(1)],
+    {
+      stdio: "inherit",
+      env: { ...process.env, KARRT_XVFB: "1" },
+    },
+  );
+  if (result.error) {
+    throw new Error(
+      "Checkout browser automation requires an X server. Install xvfb or run with xvfb-run.",
+    );
+  }
+  process.exitCode = result.status ?? 1;
+  return true;
 }
 
 function getClient(): ReweHttpClient {
@@ -87,7 +129,7 @@ storeCmd
 
 storeCmd
   .command("search <zip>")
-  .description("Find pickup stores near ZIP code")
+  .description("Find delivery service near ZIP code")
   .action((zip: string) =>
     run(async () => {
       const client = getClient();
@@ -356,7 +398,7 @@ basketCmd
 
 program
   .command("timeslots")
-  .description("List available pickup timeslots")
+  .description("List available delivery timeslots")
   .action(() =>
     run(async () => {
       const api = await getApi();
@@ -366,11 +408,60 @@ program
 
 program
   .command("timeslot-reserve <slotId>")
-  .description("Reserve a pickup timeslot")
+  .description("Reserve a delivery timeslot")
   .action((slotId: string) =>
     run(async () => {
       const api = await getApi();
       output(withTimestamp(await api.timeslotReserve(slotId)), getPretty());
+    }),
+  );
+
+// ── checkout ──
+
+const checkoutCmd = program
+  .command("checkout")
+  .description("Inspect delivery checkout readiness without placing an order");
+
+checkoutCmd
+  .command("status", { isDefault: true })
+  .description("Show basket, delivery minimum, and slot readiness")
+  .action(() =>
+    run(async () => {
+      const api = await getApi();
+      output(withTimestamp(await api.checkoutStatus()), getPretty());
+    }),
+  );
+
+checkoutCmd
+  .command("review")
+  .description("Show final pre-order review data without placing an order")
+  .action(() =>
+    run(async () => {
+      const api = await getApi();
+      output(withTimestamp(await api.checkoutStatus()), getPretty());
+    }),
+  );
+
+checkoutCmd
+  .command("place-order")
+  .description("Place the REWE order only with an explicit confirmation phrase")
+  .option("--confirm <phrase>", "Must be exactly: PLACE REWE ORDER")
+  .action((opts: { confirm?: string }) =>
+    run(async () => {
+      if (relaunchWithXvfbIfNeeded()) return;
+      const { placeOrder, reachCheckoutConfirmation } = await import("./checkout/browser.js");
+      if (opts.confirm !== "PLACE REWE ORDER") {
+        const review = await reachCheckoutConfirmation();
+        output(
+          {
+            ...withTimestamp(review),
+            message: "Dry run only. Re-run with --confirm \"PLACE REWE ORDER\" to click `Jetzt bestellen`.",
+          },
+          getPretty(),
+        );
+        return;
+      }
+      output(withTimestamp(await placeOrder(opts.confirm)), getPretty());
     }),
   );
 
@@ -444,7 +535,7 @@ receiptsCmd
 
 program
   .command("suggestion <num>")
-  .description("Suggest N items to reach free pickup threshold")
+  .description("Suggest N items to reach free delivery threshold")
   .action((num: string) =>
     run(async () => {
       const api = await getApi();

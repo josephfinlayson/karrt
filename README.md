@@ -247,15 +247,17 @@ All config is stored in `~/.config/karrt/`:
 - `session.json` — Browser cookies
 - `selected_store` / `selected_zip` — Current store
 - `basket-id` — Active basket ID
+- `checkout.json` — Optional checkout payment config used by `checkout place-order`
 - `totp-secret` — TOTP secret for 2FA
 - `login-state.json` — Login flow IPC
 - `.chrome-data/` — Persistent browser profile used by login and basket commands
 
 ## How It Works
 
-- **Search** is public — no authentication needed
+- **Search** can run anonymously, but authenticated search is required for addable listing IDs on current REWE responses
 - **Basket commands** use the persistent Chromium profile so the request is sent from the same browser context as rewe.de
 - **Orders, receipts, favorites, and timeslots** use the stored API session
+- **Checkout** uses the persistent Chromium profile and optional `~/.config/karrt/checkout.json` payment settings
 - Login uses **Playwright** with stealth plugins to automate the REWE login page
 - **Turnstile CAPTCHA** is solved by the 2Captcha browser extension running inside Chromium
 - The login page sometimes shows a "continue with remembered account" prompt instead of the login form — both flows are handled automatically
@@ -265,8 +267,9 @@ All config is stored in `~/.config/karrt/`:
 
 - Some API sessions expire frequently (~10 min) — re-run `karrt login` if non-basket commands return 401/403
 - The 2Captcha extension needs a few seconds to solve each CAPTCHA
-- Checkout/payment is not yet implemented — you can build a basket and reserve a timeslot, but need to complete the order on rewe.de
-- Only REWE Pickup is supported (not delivery)
+- Checkout/payment depends on REWE's current checkout DOM and may need maintenance if their custom elements change
+- Direct debit checkout requires valid local payment config in `~/.config/karrt/checkout.json`; invoice checkout can use `{ "payment": { "method": "INVOICE" } }`
+- Delivery is supported for the configured REWE Lieferservice market
 - Category slugs may change if REWE reorganizes their product categories
 
 ## License

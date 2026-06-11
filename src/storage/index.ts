@@ -7,6 +7,17 @@ export interface CurrentStore {
   zipCode: string;
 }
 
+export interface CheckoutConfig {
+  payment?: {
+    method?: "DIRECT_DEBIT" | "INVOICE";
+    accountOwner?: string;
+    iban?: string;
+    dateOfBirth?: string;
+  };
+}
+
+const AUTH_COOKIE_NAMES = new Set(["KEYCLOAK_IDENTITY", "KEYCLOAK_SESSION"]);
+
 function configDir(): string {
   return join(
     process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
@@ -82,7 +93,7 @@ export async function readUserId(): Promise<string | null> {
 }
 
 /** Read session state from disk. */
-export async function readSessionState(): Promise<{ cookies: import("./cookies.js").StoredCookie[] } | null> {
+export async function readSessionState(): Promise<{ userId?: string; cookies: import("./cookies.js").StoredCookie[] } | null> {
   const p = await readSessionPath();
   if (!p) return null;
   try {
@@ -122,20 +133,30 @@ export async function clearBasketId(): Promise<void> {
   await unlink(basketIdPath()).catch(() => {});
 }
 
+export async function readCheckoutConfig(): Promise<CheckoutConfig | null> {
+  try {
+    return JSON.parse(await readFile(join(configDir(), "checkout.json"), "utf-8")) as CheckoutConfig;
+  } catch {
+    return null;
+  }
+}
+
 /** Check if a session file exists with non-expired cookies. */
 export async function hasValidSession(): Promise<boolean> {
   const p = await readSessionPath();
   if (!p) return false;
   try {
     const data = JSON.parse(await readFile(p, "utf-8"));
-    const cookies = data.cookies as { expires?: number }[] | undefined;
+    if (typeof data.userId !== "string" || data.userId.length === 0) return false;
+    const cookies = data.cookies as { name?: string; expires?: number }[] | undefined;
     if (!cookies || cookies.length === 0) return false;
-    // Check if any auth-related cookies have expired
     const now = Date.now() / 1000;
-    const hasValid = cookies.some(
-      (c) => !c.expires || c.expires === -1 || c.expires > now,
+    const hasValidAuthCookie = cookies.some(
+      (c) => typeof c.name === "string"
+        && AUTH_COOKIE_NAMES.has(c.name)
+        && (!c.expires || c.expires === -1 || c.expires > now),
     );
-    return hasValid;
+    return hasValidAuthCookie;
   } catch {
     return false;
   }

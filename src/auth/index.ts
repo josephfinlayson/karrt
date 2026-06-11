@@ -7,6 +7,7 @@ import type { ReweHttpClient } from "../http/client.js";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 
 chromium.use(StealthPlugin());
 
@@ -60,16 +61,36 @@ export async function login(
     process.env.PLAYWRIGHT_BROWSERS_PATH = persistentBrowserPath;
   }
 
+  function resolveChromiumPath(): string | undefined {
+    const candidates = [
+      process.env.KARRT_CHROMIUM_PATH,
+      process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+      process.env.CHROMIUM_PATH,
+      resolve(homedir(), ".openclaw/bin/chromium"),
+      persistentChromiumPath,
+      "/run/current-system/sw/bin/chromium",
+      "/usr/bin/chromium",
+      "/usr/bin/chromium-browser",
+      "/usr/bin/google-chrome",
+    ];
+    return candidates.find((path): path is string => typeof path === "string" && existsSync(path));
+  }
+  const chromiumExecPath = resolveChromiumPath();
+  if (chromiumExecPath) {
+    console.log(`[chromium] Using executable: ${chromiumExecPath}`);
+  }
+
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless: false as const,
-    executablePath: existsSync(persistentChromiumPath)
-      ? persistentChromiumPath
-      : undefined,
+    executablePath: chromiumExecPath,
     args: [
       `--disable-extensions-except=${EXTENSION_PATH}`,
       `--load-extension=${EXTENSION_PATH}`,
       "--no-sandbox",
       "--disable-blink-features=AutomationControlled",
+      "--disable-gpu",
+      "--disable-software-rasterizer",
+      "--disable-dev-shm-usage",
     ],
     ignoreDefaultArgs: [
       "--disable-extensions",

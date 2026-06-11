@@ -2,6 +2,7 @@ node_modules/
 dist/
 .chrome-data/
 tmp/
+tmp-*.mjs
 *.log
 .env
 2captcha-solver/
