@@ -231,13 +231,15 @@ Prices are in **cents** (e.g., `currentRetailPrice: 85` = 0.85 EUR).
 
 ## Agent Skill
 
-Want an AI agent to do your grocery shopping? Install the [karrt agent skill](https://github.com/Tobi4s1337/karrt-skill):
+This repository includes an OpenClaw-compatible agent skill at `skills/karrt/`.
+Install or sync it into your OpenClaw state directory with:
 
 ```bash
-npx skills add Tobi4s1337/karrt-skill
+mkdir -p ~/.openclaw/skills
+cp -R skills/karrt ~/.openclaw/skills/karrt
 ```
 
-The skill works with [Claude Code](https://claude.ai/code), [Cursor](https://cursor.com), [Codex](https://openai.com/codex), and [40+ other agents](https://github.com/vercel-labs/skills#supported-agents) that support the Agent Skills spec.
+The skill documents authenticated search, basket management, delivery slot reservation, checkout config, and safe order placement through the Karrt CLI.
 
 ## Session Management
 
